@@ -1,0 +1,48 @@
+name: Weekly collect reminder
+
+on:
+  schedule:
+    # Saturday evening, US/Central. UTC offset changes with DST (CDT=UTC-5,
+    # CST=UTC-6), so two cron lines cover both halves of the year; GitHub
+    # Actions runs both but the job below no-ops outside its own local window.
+    - cron: "0 1 * * 0"   # 7:00 PM CDT Saturday (UTC-5, roughly Mar-Nov)
+    - cron: "0 2 * * 0"   # 7:00 PM CST Saturday (UTC-6, roughly Nov-Mar)
+  workflow_dispatch: {}
+
+permissions:
+  issues: write
+
+jobs:
+  post-reminder:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get this week's collect
+        id: collect
+        run: |
+          set +e
+          OUTPUT=$(python3 scripts/get_collect.py)
+          STATUS=$?
+          {
+            echo "output<<EOF"
+            echo "$OUTPUT"
+            echo "EOF"
+            echo "status=$STATUS"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Open reminder issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = "${{ steps.collect.outputs.status }}";
+            const output = `${{ steps.collect.outputs.output }}`;
+            const title = status === "0"
+              ? "Post this Sunday's collect"
+              : "Action needed: collect text missing for this Sunday";
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body: output,
+            });
