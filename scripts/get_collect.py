@@ -61,7 +61,7 @@ def main() -> int:
         )
         return 1
 
-    post = f"{text}\n\n- collect for {title}, Book of Common Prayer"
+    post = f"{text}\n\n- collect for {title}"
     print(post)
     return 0
 
