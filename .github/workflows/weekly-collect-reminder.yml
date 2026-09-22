@@ -2,11 +2,11 @@ name: Weekly collect email
 
 on:
   schedule:
-    # Two candidate UTC times, one per DST state; the "Only run at 7pm
+    # Two candidate UTC times, one per DST state; the "Only run at 6am
     # Central" step below skips whichever one doesn't actually land at
-    # 7:00 PM in America/Chicago that week, so exactly one email goes out.
-    - cron: "0 0 * * 0"   # 7:00 PM CDT Saturday (UTC-5, roughly Mar-Nov)
-    - cron: "0 1 * * 0"   # 7:00 PM CST Saturday (UTC-6, roughly Nov-Mar)
+    # 6:00 AM in America/Chicago that week, so exactly one email goes out.
+    - cron: "0 11 * * 0"   # 6:00 AM CDT Sunday (UTC-5, roughly Mar-Nov)
+    - cron: "0 12 * * 0"   # 6:00 AM CST Sunday (UTC-6, roughly Nov-Mar)
   workflow_dispatch: {}
 
 jobs:
@@ -15,17 +15,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Only run at 7pm Central
+      - name: Only run at 6am Central
         id: check
         run: |
           hour=$(TZ="America/Chicago" date +%H)
-          if [ "$hour" = "19" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "$hour" = "06" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "should_run=true" >> "$GITHUB_OUTPUT"
           else
             echo "should_run=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Get tomorrow's collect
+      - name: Get today's collect
         if: steps.check.outputs.should_run == 'true'
         id: collect
         run: |
@@ -43,7 +43,7 @@ jobs:
           password: ${{ secrets.MAIL_PASSWORD }}
           from: ${{ secrets.MAIL_USERNAME }}
           to: j.chris.todd@gmail.com
-          subject: "Tomorrow's collect - ready to post"
+          subject: "Today's collect - ready to post"
           body: file://collect_output.txt
 
       - name: Email a warning if the collect text is missing
@@ -56,5 +56,5 @@ jobs:
           password: ${{ secrets.MAIL_PASSWORD }}
           from: ${{ secrets.MAIL_USERNAME }}
           to: j.chris.todd@gmail.com
-          subject: "ACTION NEEDED: collect text missing for tomorrow"
+          subject: "ACTION NEEDED: collect text missing for today"
           body: file://collect_error.txt

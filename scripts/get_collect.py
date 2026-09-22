@@ -61,7 +61,7 @@ def main() -> int:
         )
         return 1
 
-    post = f"Collect for {title} ({target.strftime('%B %-d, %Y')})\n\n{text}"
+    post = f"{text}\n\n- collect for {title}, Book of Common Prayer"
     print(post)
     return 0
 

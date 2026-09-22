@@ -18,10 +18,10 @@ Facebook's API no longer allows automated posting to a personal profile
 3. `scripts/get_collect.py` looks up the upcoming Sunday (or a date you
    pass it) and prints ready-to-paste post text.
 4. `.github/workflows/weekly-collect-reminder.yml` runs that script every
-   Saturday at 7:00 PM US/Central and emails you the result — ready to
-   copy and paste into a Facebook post the next morning. (Two cron
-   triggers cover both sides of the DST switch; a guard step checks the
-   actual Central time and only lets one of them through each week.)
+   Sunday at 6:00 AM US/Central and emails you the result — ready to copy
+   and paste into a Facebook post right away. (Two cron triggers cover
+   both sides of the DST switch; a guard step checks the actual Central
+   time and only lets one of them through each week.)
 
 ## Setting up the email
 
@@ -46,7 +46,7 @@ account first. Any SMTP provider works the same way — just swap the
 server/port.
 
 Test it any time with the "Run workflow" button on the Actions tab
-(bypasses the 7pm check).
+(bypasses the 6am check).
 
 ## Trying it locally
 
