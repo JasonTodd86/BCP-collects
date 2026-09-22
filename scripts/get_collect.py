@@ -62,7 +62,7 @@ def main() -> int:
         return 1
 
     subject = "the " + title[4:] if title.startswith("The ") else title
-    post = f"{text}\n\n— Collect for {subject}, Book of Common Prayer"
+    post = f"{text}\n\n- Collect for {subject}, Book of Common Prayer"
     print(post)
     return 0
 
