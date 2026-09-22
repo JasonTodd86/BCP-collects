@@ -1,48 +1,60 @@
-name: Weekly collect reminder
+name: Weekly collect email
 
 on:
   schedule:
-    # Saturday evening, US/Central. UTC offset changes with DST (CDT=UTC-5,
-    # CST=UTC-6), so two cron lines cover both halves of the year; GitHub
-    # Actions runs both but the job below no-ops outside its own local window.
-    - cron: "0 1 * * 0"   # 7:00 PM CDT Saturday (UTC-5, roughly Mar-Nov)
-    - cron: "0 2 * * 0"   # 7:00 PM CST Saturday (UTC-6, roughly Nov-Mar)
+    # Two candidate UTC times, one per DST state; the "Only run at 7pm
+    # Central" step below skips whichever one doesn't actually land at
+    # 7:00 PM in America/Chicago that week, so exactly one email goes out.
+    - cron: "0 0 * * 0"   # 7:00 PM CDT Saturday (UTC-5, roughly Mar-Nov)
+    - cron: "0 1 * * 0"   # 7:00 PM CST Saturday (UTC-6, roughly Nov-Mar)
   workflow_dispatch: {}
 
-permissions:
-  issues: write
-
 jobs:
-  post-reminder:
+  send-collect-email:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Get this week's collect
+      - name: Only run at 7pm Central
+        id: check
+        run: |
+          hour=$(TZ="America/Chicago" date +%H)
+          if [ "$hour" = "19" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Get tomorrow's collect
+        if: steps.check.outputs.should_run == 'true'
         id: collect
         run: |
           set +e
-          OUTPUT=$(python3 scripts/get_collect.py)
-          STATUS=$?
-          {
-            echo "output<<EOF"
-            echo "$OUTPUT"
-            echo "EOF"
-            echo "status=$STATUS"
-          } >> "$GITHUB_OUTPUT"
+          python3 scripts/get_collect.py > collect_output.txt 2> collect_error.txt
+          echo "status=$?" >> "$GITHUB_OUTPUT"
 
-      - name: Open reminder issue
-        uses: actions/github-script@v7
+      - name: Email the collect
+        if: steps.check.outputs.should_run == 'true' && steps.collect.outputs.status == '0'
+        uses: dawidd6/action-send-mail@v3
         with:
-          script: |
-            const status = "${{ steps.collect.outputs.status }}";
-            const output = `${{ steps.collect.outputs.output }}`;
-            const title = status === "0"
-              ? "Post this Sunday's collect"
-              : "Action needed: collect text missing for this Sunday";
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title,
-              body: output,
-            });
+          server_address: ${{ secrets.MAIL_SERVER }}
+          server_port: ${{ secrets.MAIL_PORT }}
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          from: ${{ secrets.MAIL_USERNAME }}
+          to: j.chris.todd@gmail.com
+          subject: "Tomorrow's collect - ready to post"
+          body: file://collect_output.txt
+
+      - name: Email a warning if the collect text is missing
+        if: steps.check.outputs.should_run == 'true' && steps.collect.outputs.status != '0'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.MAIL_SERVER }}
+          server_port: ${{ secrets.MAIL_PORT }}
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          from: ${{ secrets.MAIL_USERNAME }}
+          to: j.chris.todd@gmail.com
+          subject: "ACTION NEEDED: collect text missing for tomorrow"
+          body: file://collect_error.txt

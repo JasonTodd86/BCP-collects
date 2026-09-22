@@ -18,11 +18,35 @@ Facebook's API no longer allows automated posting to a personal profile
 3. `scripts/get_collect.py` looks up the upcoming Sunday (or a date you
    pass it) and prints ready-to-paste post text.
 4. `.github/workflows/weekly-collect-reminder.yml` runs that script every
-   Saturday evening and opens a GitHub issue with the result, so a
-   notification lands in your inbox in time to use Facebook's own
-   "Schedule post" feature for 8:00 AM Sunday. **The cron schedule is
-   currently stubbed for US/Central — confirm or change it before relying
-   on it.**
+   Saturday at 7:00 PM US/Central and emails you the result — ready to
+   copy and paste into a Facebook post the next morning. (Two cron
+   triggers cover both sides of the DST switch; a guard step checks the
+   actual Central time and only lets one of them through each week.)
+
+## Setting up the email
+
+Uses [dawidd6/action-send-mail](https://github.com/dawidd6/action-send-mail)
+over SMTP. Add these as repository secrets (Settings -> Secrets and
+variables -> Actions -> New repository secret) — never put real
+credentials in the workflow file itself:
+
+| Secret | Example (Gmail) |
+| --- | --- |
+| `MAIL_SERVER` | `smtp.gmail.com` |
+| `MAIL_PORT` | `465` |
+| `MAIL_USERNAME` | your Gmail address |
+| `MAIL_PASSWORD` | a 16-character [Gmail app password](https://myaccount.google.com/apppasswords) — not your normal password |
+
+The reminder is hardcoded to send to `j.chris.todd@gmail.com` (see the
+`to:` line in the workflow) — change it there directly if that ever needs
+to be a different address.
+
+Gmail app passwords require 2-Step Verification to be turned on for the
+account first. Any SMTP provider works the same way — just swap the
+server/port.
+
+Test it any time with the "Run workflow" button on the Actions tab
+(bypasses the 7pm check).
 
 ## Trying it locally
 
