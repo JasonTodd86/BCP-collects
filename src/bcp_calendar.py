@@ -3,13 +3,12 @@
 Given any Sunday date, works out which Sunday of the church year it is
 (Advent 1, Epiphany 3, Proper 14, etc.) so the right collect can be looked
 up. Movable feasts are derived from the date of Easter; the "Season after
-Pentecost" uses the standard Proper-number-to-date table shared by the
-1979 BCP / Revised Common Lectionary, which the 2019 ACNA BCP inherited.
-
-The exact wording ACNA uses for a couple of boundary Sundays (the last
-Sunday after the Epiphany, and the last Sunday before Advent) should be
-checked against the actual BCP table of contents once the collect text is
-sourced -- see README.md.
+Pentecost" uses the Proper-number-to-week table printed in the BCP itself
+("Collects of the Christian Year", pp. 613-622), which assigns each Proper
+to the Sunday falling in a specific 7-day window (e.g. Proper 1 = the
+Sunday from May 8-14). That window is, by construction, always the Sunday
+nearest to the window's middle day, which is how proper_anchor_date below
+computes it without hardcoding 29 date ranges.
 """
 
 from __future__ import annotations
@@ -70,8 +69,9 @@ def church_year_start(d: date) -> date:
 
 
 # Proper N is kept on the Sunday nearest this anchor date, one week later
-# for each successive Proper. Standard RCL / 1979 BCP table.
-_PROPER_1_ANCHOR = (5, 11)  # May 11
+# for each successive Proper (BCP 2019, pp. 613-622: "Proper 1 - Week of
+# the Sunday from May 8 to May 14", "Proper 2 - ... May 15 to May 21", etc.)
+_PROPER_1_ANCHOR = (5, 11)  # May 11, the middle day of the May 8-14 window
 
 
 def proper_anchor_date(n: int, year: int) -> date:
@@ -100,13 +100,14 @@ def describe_sunday(d: date) -> SundayInfo:
     trinity = easter + timedelta(days=56)
     next_advent = advent_sunday(easter_year)
     last_epiphany_sunday = ash_wednesday - timedelta(days=3)
+    second_to_last_epiphany_sunday = last_epiphany_sunday - timedelta(days=7)
     epiphany_day = date(easter_year, 1, 6)
     christmas_day = date(cy_year, 12, 25)
 
     # Advent (weeks 0-3 after cy_start)
     if cy_start <= d < cy_start + timedelta(days=28):
         n = (d - cy_start).days // 7 + 1
-        return SundayInfo(f"advent-{n}", f"The {ordinal(n)} Sunday of Advent")
+        return SundayInfo(f"advent-{n}", f"The {ordinal(n)} Sunday in Advent")
 
     # Christmas season (Sundays strictly between Christmas Day and Epiphany)
     if christmas_day < d < epiphany_day:
@@ -114,19 +115,27 @@ def describe_sunday(d: date) -> SundayInfo:
         if first == christmas_day:
             first += timedelta(days=7)
         n = (d - first).days // 7 + 1
-        return SundayInfo(f"christmas-{n}", f"The {ordinal(n)} Sunday after Christmas Day")
+        return SundayInfo(f"christmas-{n}", f"The {ordinal(n)} Sunday of Christmas")
 
     if d == epiphany_day:
-        return SundayInfo("epiphany-day", "The Epiphany of Our Lord")
+        return SundayInfo("epiphany-day", "The Epiphany")
 
-    # Epiphany season
-    if epiphany_day < d < last_epiphany_sunday:
-        first = epiphany_day + timedelta(days=(6 - epiphany_day.weekday()) % 7)
-        n = (d - first).days // 7 + 1
-        return SundayInfo(f"epiphany-{n}", f"The {ordinal(n)} Sunday after the Epiphany")
+    # First Sunday of Epiphany: the Sunday following Jan 6 (the Sunday
+    # *after* Jan 6 even when Jan 6 itself is a Sunday -- the BCP treats
+    # that day as "The Epiphany", not as the First Sunday of Epiphany).
+    epiphany_first = epiphany_day + timedelta(days=(6 - epiphany_day.weekday()) % 7)
+    if epiphany_first == epiphany_day:
+        epiphany_first += timedelta(days=7)
 
     if d == last_epiphany_sunday:
-        return SundayInfo("epiphany-last", "The Last Sunday after the Epiphany")
+        return SundayInfo("epiphany-last", "The Last Sunday of Epiphany")
+
+    if d == second_to_last_epiphany_sunday and second_to_last_epiphany_sunday > epiphany_first:
+        return SundayInfo("epiphany-second-to-last", "The Second to Last Sunday of Epiphany")
+
+    if epiphany_first <= d < second_to_last_epiphany_sunday:
+        n = (d - epiphany_first).days // 7 + 1
+        return SundayInfo(f"epiphany-{n}", f"The {ordinal(n)} Sunday of Epiphany")
 
     # Lent
     lent_1 = ash_wednesday + timedelta(days=4)
@@ -140,8 +149,12 @@ def describe_sunday(d: date) -> SundayInfo:
     if d == easter:
         return SundayInfo("easter-day", "Easter Day")
 
+    # Easter 2-6; the Sunday between Ascension Day and Pentecost has its
+    # own title rather than being "Easter 7".
     if easter < d < pentecost:
         n = (d - easter).days // 7 + 1
+        if n == 7:
+            return SundayInfo("sunday-after-ascension", "The Sunday after Ascension Day")
         return SundayInfo(f"easter-{n}", f"The {ordinal(n)} Sunday of Easter")
 
     if d == pentecost:
@@ -150,28 +163,31 @@ def describe_sunday(d: date) -> SundayInfo:
     if d == trinity:
         return SundayInfo("trinity", "Trinity Sunday")
 
-    # Season after Pentecost: Propers
+    # Season after Pentecost: Propers (Proper 29 is always Christ the King,
+    # the Sunday immediately before Advent Sunday).
     if trinity < d < next_advent:
-        last_before_advent = next_advent - timedelta(days=7)
-        if d == last_before_advent:
-            return SundayInfo("christ-the-king", "Christ the King")
         for n in range(1, 30):
             if proper_anchor_date(n, easter_year) == d:
-                return SundayInfo(f"proper-{n}", f"Proper {n}")
+                title = f"Proper {n}"
+                if n == 29:
+                    title += ": Christ the King"
+                return SundayInfo(f"proper-{n}", title)
         raise ValueError(f"Could not match {d} to a Proper")
 
     raise ValueError(f"Could not classify {d} in the church calendar")
 
 
 if __name__ == "__main__":
-    # Sanity checks against well-known dates.
     assert easter_date(2026) == date(2026, 4, 5), easter_date(2026)
     assert easter_date(2027) == date(2027, 3, 28), easter_date(2027)
     assert advent_sunday(2026) == date(2026, 11, 29), advent_sunday(2026)
     print("2026-11-29:", describe_sunday(date(2026, 11, 29)))
-    print("2026-12-25 is a Friday; nearest Sundays around it:")
     print("2027-01-03:", describe_sunday(date(2027, 1, 3)))
     print("2027-03-28 (Easter 2027):", describe_sunday(date(2027, 3, 28)))
     print("2026-09-20 (this week):", describe_sunday(date(2026, 9, 20)))
     print("2026-09-27:", describe_sunday(date(2026, 9, 27)))
+    print("2027-05-16 (Pentecost 2027):", describe_sunday(date(2027, 5, 16)))
+    print("2027-05-23 (Trinity 2027):", describe_sunday(date(2027, 5, 23)))
+    print("2027-05-09 (Sunday after Ascension 2027):", describe_sunday(date(2027, 5, 9)))
+    print("2027-11-21 (last before Advent 2027):", describe_sunday(date(2027, 11, 21)))
     print("All sanity checks passed.")

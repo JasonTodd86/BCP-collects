@@ -9,22 +9,20 @@ Facebook's API no longer allows automated posting to a personal profile
 1. `src/bcp_calendar.py` works out which Sunday of the church year a given
    date is (Advent 1, Epiphany 3, Proper 14, Christ the King, ...) from the
    date of Easter.
-2. `data/collects.json` holds the collect text for each of those Sundays,
-   keyed to match. **Text starts out `null` for every entry** — it must be
-   filled in from an authoritative copy of the 2019 BCP before it's useful.
+2. `data/collects.json` holds the collect for each of those Sundays, keyed
+   to match. Text is copied verbatim from
+   `BCP-2019-MASTER-5th-PRINTING-05022022-3.pdf` (`Collects of the
+   Christian Year`, pp. 598-622), with a `source` page number on every
+   entry. Where the BCP gives two alternative collects for a day, the
+   first is used.
 3. `scripts/get_collect.py` looks up the upcoming Sunday (or a date you
-   pass it) and prints ready-to-paste post text, or fails loudly if that
-   Sunday's text hasn't been entered yet.
+   pass it) and prints ready-to-paste post text.
 4. `.github/workflows/weekly-collect-reminder.yml` runs that script every
    Saturday evening and opens a GitHub issue with the result, so a
    notification lands in your inbox in time to use Facebook's own
-   "Schedule post" feature for 8:00 AM Sunday.
-
-## Filling in the collects
-
-Edit `data/collects.json` and set `text` (and ideally `source`, e.g. a page
-number) for each Sunday. `title` can be adjusted too if the BCP's exact
-wording differs from the placeholder.
+   "Schedule post" feature for 8:00 AM Sunday. **The cron schedule is
+   currently stubbed for US/Central — confirm or change it before relying
+   on it.**
 
 ## Trying it locally
 
