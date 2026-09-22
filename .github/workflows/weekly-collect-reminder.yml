@@ -1,0 +1,60 @@
+name: Weekly collect email
+
+on:
+  schedule:
+    # Two candidate UTC times, one per DST state; the "Only run at 7pm
+    # Central" step below skips whichever one doesn't actually land at
+    # 7:00 PM in America/Chicago that week, so exactly one email goes out.
+    - cron: "0 0 * * 0"   # 7:00 PM CDT Saturday (UTC-5, roughly Mar-Nov)
+    - cron: "0 1 * * 0"   # 7:00 PM CST Saturday (UTC-6, roughly Nov-Mar)
+  workflow_dispatch: {}
+
+jobs:
+  send-collect-email:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Only run at 7pm Central
+        id: check
+        run: |
+          hour=$(TZ="America/Chicago" date +%H)
+          if [ "$hour" = "19" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Get tomorrow's collect
+        if: steps.check.outputs.should_run == 'true'
+        id: collect
+        run: |
+          set +e
+          python3 scripts/get_collect.py > collect_output.txt 2> collect_error.txt
+          echo "status=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Email the collect
+        if: steps.check.outputs.should_run == 'true' && steps.collect.outputs.status == '0'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.MAIL_SERVER }}
+          server_port: ${{ secrets.MAIL_PORT }}
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          from: ${{ secrets.MAIL_USERNAME }}
+          to: j.chris.todd@gmail.com
+          subject: "Tomorrow's collect - ready to post"
+          body: file://collect_output.txt
+
+      - name: Email a warning if the collect text is missing
+        if: steps.check.outputs.should_run == 'true' && steps.collect.outputs.status != '0'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.MAIL_SERVER }}
+          server_port: ${{ secrets.MAIL_PORT }}
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          from: ${{ secrets.MAIL_USERNAME }}
+          to: j.chris.todd@gmail.com
+          subject: "ACTION NEEDED: collect text missing for tomorrow"
+          body: file://collect_error.txt
