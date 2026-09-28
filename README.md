@@ -18,10 +18,16 @@ Facebook's API no longer allows automated posting to a personal profile
 3. `scripts/get_collect.py` looks up the upcoming Sunday (or a date you
    pass it) and prints ready-to-paste post text.
 4. `.github/workflows/weekly-collect-reminder.yml` runs that script every
-   Sunday at 6:00 AM US/Central and emails you the result — ready to copy
-   and paste into a Facebook post right away. (Two cron triggers cover
-   both sides of the DST switch; a guard step checks the actual Central
-   time and only lets one of them through each week.)
+   Sunday around 6:00 AM US/Central and emails you the result — ready to
+   copy and paste into a Facebook post. Two cron triggers cover both
+   sides of the DST switch. GitHub Actions doesn't guarantee scheduled
+   runs happen on time (it documents delays of an hour or more under
+   load, and we've seen delays of several hours in practice), so rather
+   than gating on the exact hour, the workflow caches a small marker keyed
+   to the ISO week: whichever of the two triggers fires first sends the
+   email, and any later run that week (the other DST trigger, or a delayed
+   retry) sees the marker already there and skips. It'll usually arrive
+   close to 6am, but a slow GitHub morning means later, not never.
 
 ## Setting up the email
 
@@ -45,8 +51,9 @@ Gmail app passwords require 2-Step Verification to be turned on for the
 account first. Any SMTP provider works the same way — just swap the
 server/port.
 
-Test it any time with the "Run workflow" button on the Actions tab
-(bypasses the 6am check).
+Test it any time with the "Run workflow" button on the Actions tab —
+manual runs always send regardless of the once-per-week cache, so you can
+re-test as often as you like without waiting for next Sunday.
 
 ## Trying it locally
 

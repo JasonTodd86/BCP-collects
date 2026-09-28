@@ -2,11 +2,15 @@ name: Weekly collect email
 
 on:
   schedule:
-    # Two candidate UTC times, one per DST state; the "Only run at 6am
-    # Central" step below skips whichever one doesn't actually land at
-    # 6:00 AM in America/Chicago that week, so exactly one email goes out.
-    - cron: "0 11 * * 0"   # 6:00 AM CDT Sunday (UTC-5, roughly Mar-Nov)
-    - cron: "0 12 * * 0"   # 6:00 AM CST Sunday (UTC-6, roughly Nov-Mar)
+    # Two candidate UTC times, one per DST state (minute 7 rather than 0,
+    # since GitHub Actions documents top-of-the-hour schedules as most
+    # likely to be delayed under load). Both are kept for redundancy --
+    # whichever lands closer to 6am Central sends the email; the other is
+    # suppressed by the once-per-week cache below, not by a time check,
+    # since GitHub has been observed delaying scheduled runs by several
+    # hours, which a strict "is it 6am right now" check can't survive.
+    - cron: "7 11 * * 0"   # ~6:00 AM CDT Sunday (UTC-5, roughly Mar-Nov)
+    - cron: "7 12 * * 0"   # ~6:00 AM CST Sunday (UTC-6, roughly Nov-Mar)
   workflow_dispatch: {}
 
 jobs:
@@ -15,18 +19,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Only run at 6am Central
-        id: check
-        run: |
-          hour=$(TZ="America/Chicago" date +%H)
-          if [ "$hour" = "06" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "should_run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "should_run=false" >> "$GITHUB_OUTPUT"
-          fi
+      - name: Compute this week's id
+        id: week
+        run: echo "id=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+
+      - name: Check whether this week's email already went out
+        id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: sent-marker.txt
+          key: collect-sent-${{ steps.week.outputs.id }}
 
       - name: Get today's collect
-        if: steps.check.outputs.should_run == 'true'
+        if: steps.cache.outputs.cache-hit != 'true' || github.event_name == 'workflow_dispatch'
         id: collect
         run: |
           set +e
@@ -34,7 +39,7 @@ jobs:
           echo "status=$?" >> "$GITHUB_OUTPUT"
 
       - name: Email the collect
-        if: steps.check.outputs.should_run == 'true' && steps.collect.outputs.status == '0'
+        if: (steps.cache.outputs.cache-hit != 'true' || github.event_name == 'workflow_dispatch') && steps.collect.outputs.status == '0'
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: ${{ secrets.MAIL_SERVER }}
@@ -46,8 +51,19 @@ jobs:
           subject: "Today's collect - ready to post"
           body: file://collect_output.txt
 
+      - name: Mark this week as sent
+        if: (steps.cache.outputs.cache-hit != 'true' || github.event_name == 'workflow_dispatch') && steps.collect.outputs.status == '0'
+        run: echo "sent $(date -u)" > sent-marker.txt
+
+      - name: Save the sent marker so later runs this week don't resend
+        if: (steps.cache.outputs.cache-hit != 'true' || github.event_name == 'workflow_dispatch') && steps.collect.outputs.status == '0'
+        uses: actions/cache/save@v4
+        with:
+          path: sent-marker.txt
+          key: collect-sent-${{ steps.week.outputs.id }}
+
       - name: Email a warning if the collect text is missing
-        if: steps.check.outputs.should_run == 'true' && steps.collect.outputs.status != '0'
+        if: (steps.cache.outputs.cache-hit != 'true' || github.event_name == 'workflow_dispatch') && steps.collect.outputs.status != '0'
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: ${{ secrets.MAIL_SERVER }}
