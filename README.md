@@ -17,17 +17,19 @@ Facebook's API no longer allows automated posting to a personal profile
    first is used.
 3. `scripts/get_collect.py` looks up the upcoming Sunday (or a date you
    pass it) and prints ready-to-paste post text.
-4. `.github/workflows/weekly-collect-reminder.yml` runs that script every
-   Sunday around 6:00 AM US/Central and emails you the result — ready to
-   copy and paste into a Facebook post. Two cron triggers cover both
-   sides of the DST switch. GitHub Actions doesn't guarantee scheduled
-   runs happen on time (it documents delays of an hour or more under
-   load, and we've seen delays of several hours in practice), so rather
-   than gating on the exact hour, the workflow caches a small marker keyed
-   to the ISO week: whichever of the two triggers fires first sends the
-   email, and any later run that week (the other DST trigger, or a delayed
-   retry) sees the marker already there and skips. It'll usually arrive
-   close to 6am, but a slow GitHub morning means later, not never.
+4. `.github/workflows/weekly-collect-reminder.yml` runs that script and
+   emails you the result — ready to copy and paste into a Facebook post.
+   It's scheduled for 1:00 AM US/Central, not the 6:00 AM target delivery
+   time, because GitHub has twice delayed this exact schedule by about
+   4.7-4.75 hours (observed, not a GitHub guarantee -- their docs only
+   say high load *can* delay a scheduled run, with no bound on how much).
+   Firing ~5 hours early is a calibrated guess to land close to 6am; if
+   GitHub's delay pattern drifts, these cron times are the first thing to
+   re-tune. Two cron triggers cover both sides of the DST switch. Rather
+   than gating on an exact hour (which can't survive a multi-hour delay),
+   the workflow caches a small marker keyed to the ISO week: whichever
+   trigger fires first sends the email, and any later run that week (the
+   other DST trigger, or a delayed retry) sees the marker and skips.
 
 ## Setting up the email
 
