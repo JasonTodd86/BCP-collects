@@ -1,6 +1,6 @@
 # BCP-collects
 
-A helper for posting the Sunday collect from the 2019 ACNA Book of Common
+A Python helper for posting the Sunday collect from the 2019 ACNA Book of Common
 Prayer to a personal Facebook profile.
 
 Facebook's API no longer allows automated posting to a personal profile
@@ -10,10 +10,9 @@ Facebook's API no longer allows automated posting to a personal profile
    date is (Advent 1, Epiphany 3, Proper 14, Christ the King, ...) from the
    date of Easter.
 2. `data/collects.json` holds the collect for each of those Sundays, keyed
-   to match. Text is copied verbatim from
-   `BCP-2019-MASTER-5th-PRINTING-05022022-3.pdf` (`Collects of the
-   Christian Year`, pp. 598-622), with a `source` page number on every
-   entry. Where the BCP gives two alternative collects for a day, the
+   to match. Text is copied verbatim from the 2019 BCP's `Collects of the
+   Christian Year` section (pp. 598-622), with a `source` page number on
+   every entry. Where the BCP gives two alternative collects for a day, the
    first is used.
 3. `scripts/get_collect.py` looks up the upcoming Sunday (or a date you
    pass it) and prints ready-to-paste post text.
@@ -30,6 +29,14 @@ Facebook's API no longer allows automated posting to a personal profile
    the workflow caches a small marker keyed to the ISO week: whichever
    trigger fires first sends the email, and any later run that week (the
    other DST trigger, or a delayed retry) sees the marker and skips.
+
+## About the Book of Common Prayer PDF
+
+The 2019 BCP is a copyrighted book, so the PDF is not included in this
+repository. `data/collects.json` already holds the collects with page
+references. To check them or re-extract, get your own copy of the book
+(5th printing, 2022) and compare against `Collects of the Christian
+Year`, pp. 598-622.
 
 ## Setting up the email
 
@@ -56,6 +63,10 @@ server/port.
 Test it any time with the "Run workflow" button on the Actions tab —
 manual runs always send regardless of the once-per-week cache, so you can
 re-test as often as you like without waiting for next Sunday.
+
+## Stack
+
+Python 3, GitHub Actions (scheduled workflow with a weekly cache marker), SMTP email via `dawidd6/action-send-mail`
 
 ## Trying it locally
 
